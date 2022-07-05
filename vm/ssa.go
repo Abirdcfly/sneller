@@ -4647,11 +4647,6 @@ func checkImmediateBeforeEmit3(op bcop, imm0Size, imm1Size, imm2Size int) {
 	}
 }
 
-func (c *compilestate) emitOpcode(op bcop) {
-
-	c.instrs = append(c.instrs, byte(op), byte(op>>8))
-}
-
 func (c *compilestate) emitImmU8(imm uint8) {
 
 	c.instrs = append(c.instrs, byte(imm))
@@ -4670,6 +4665,21 @@ func (c *compilestate) emitImmU32(imm uint32) {
 func (c *compilestate) emitImmU64(imm uint64) {
 
 	c.instrs = append(c.instrs, byte(imm), byte(imm>>8), byte(imm>>16), byte(imm>>24), byte(imm>>32), byte(imm>>40), byte(imm>>48), byte(imm>>56))
+}
+
+func (c *compilestate) emitImmUPtr(imm uintptr) {
+
+	c.emitImmU64(uint64(imm))
+}
+
+func (c *compilestate) emitOpcode(op bcop) {
+
+	//addr := getOpcodeAddress(uint16(op))
+	//fmt.Printf("emitOpcode %d, address=%x\n", op, addr)
+
+	//c.instrs = append(c.instrs, byte(op), byte(op>>8))
+	c.emitImmU16(uint16(op))
+	//c.emitImmUPtr(addr)
 }
 
 func (c *compilestate) op(v *value, op bcop) {
