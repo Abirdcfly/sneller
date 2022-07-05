@@ -4647,90 +4647,96 @@ func checkImmediateBeforeEmit3(op bcop, imm0Size, imm1Size, imm2Size int) {
 	}
 }
 
+func (c *compilestate) emitOpcode(op bcop) {
+
+	c.instrs = append(c.instrs, byte(op), byte(op>>8))
+}
+
+func (c *compilestate) emitImmU8(imm uint8) {
+
+	c.instrs = append(c.instrs, byte(imm))
+}
+
+func (c *compilestate) emitImmU16(imm uint16) {
+
+	c.instrs = append(c.instrs, byte(imm), byte(imm>>8))
+}
+
+func (c *compilestate) emitImmU32(imm uint32) {
+
+	c.instrs = append(c.instrs, byte(imm), byte(imm>>8), byte(imm>>16), byte(imm>>24))
+}
+
+func (c *compilestate) emitImmU64(imm uint64) {
+
+	c.instrs = append(c.instrs, byte(imm), byte(imm>>8), byte(imm>>16), byte(imm>>24), byte(imm>>32), byte(imm>>40), byte(imm>>48), byte(imm>>56))
+}
+
 func (c *compilestate) op(v *value, op bcop) {
 	info := &opinfo[op]
 	if len(info.imms) != 0 {
 		panic(fmt.Sprintf("bytecode op '%s' requires %d immediate(s), not %d", info.text, len(info.imms), 0))
 	}
-	c.instrs = append(c.instrs, byte(op), byte(op>>8))
+	c.emitOpcode(op)
 }
 
 func (c *compilestate) opu8(v *value, op bcop, imm uint8) {
 	checkImmediateBeforeEmit1(op, 1)
-	c.instrs = append(
-		c.instrs,
-		byte(op), byte(op>>8),
-		byte(imm))
+	c.emitOpcode(op)
+	c.emitImmU8(imm)
 }
 
 func (c *compilestate) opu16(v *value, op bcop, imm0 uint16) {
 	checkImmediateBeforeEmit1(op, 2)
-	c.instrs = append(
-		c.instrs,
-		byte(op), byte(op>>8),
-		byte(imm0), byte(imm0>>8))
+	c.emitOpcode(op)
+	c.emitImmU16(imm0)
 }
 
 func (c *compilestate) opu32(v *value, op bcop, imm0 uint32) {
 	checkImmediateBeforeEmit1(op, 4)
-	c.instrs = append(
-		c.instrs,
-		byte(op), byte(op>>8),
-		byte(imm0), byte(imm0>>8), byte(imm0>>16), byte(imm0>>24))
+	c.emitOpcode(op)
+	c.emitImmU32(imm0)
 }
 
 func (c *compilestate) opu64(v *value, op bcop, imm0 uint64) {
 	checkImmediateBeforeEmit1(op, 8)
-	c.instrs = append(
-		c.instrs,
-		byte(op), byte(op>>8),
-		byte(imm0), byte(imm0>>8), byte(imm0>>16), byte(imm0>>24), byte(imm0>>32), byte(imm0>>40), byte(imm0>>48), byte(imm0>>56))
+	c.emitImmU64(imm0)
 }
 
 func (c *compilestate) opu16u16(v *value, op bcop, imm0, imm1 uint16) {
 	checkImmediateBeforeEmit2(op, 2, 2)
-	c.instrs = append(
-		c.instrs,
-		byte(op), byte(op>>8),
-		byte(imm0), byte(imm0>>8),
-		byte(imm1), byte(imm1>>8))
+	c.emitOpcode(op)
+	c.emitImmU16(imm0)
+	c.emitImmU16(imm1)
 }
 
 func (c *compilestate) opu16u32(v *value, op bcop, imm0 uint16, imm1 uint32) {
 	checkImmediateBeforeEmit2(op, 2, 4)
-	c.instrs = append(
-		c.instrs,
-		byte(op), byte(op>>8),
-		byte(imm0), byte(imm0>>8),
-		byte(imm1), byte(imm1>>8), byte(imm1>>16), byte(imm1>>24))
+	c.emitOpcode(op)
+	c.emitImmU16(imm0)
+	c.emitImmU32(imm1)
 }
 
 func (c *compilestate) opu16u64(v *value, op bcop, imm0 uint16, imm1 uint64) {
 	checkImmediateBeforeEmit2(op, 2, 8)
-	c.instrs = append(
-		c.instrs,
-		byte(op), byte(op>>8),
-		byte(imm0), byte(imm0>>8),
-		byte(imm1), byte(imm1>>8), byte(imm1>>16), byte(imm1>>24), byte(imm1>>32), byte(imm1>>40), byte(imm1>>48), byte(imm1>>56))
+	c.emitOpcode(op)
+	c.emitImmU16(imm0)
+	c.emitImmU64(imm1)
 }
 
 func (c *compilestate) opu32u32(v *value, op bcop, imm0 uint32, imm1 uint32) {
 	checkImmediateBeforeEmit2(op, 4, 4)
-	c.instrs = append(
-		c.instrs,
-		byte(op), byte(op>>8),
-		byte(imm0), byte(imm0>>8), byte(imm0>>16), byte(imm0>>24),
-		byte(imm1), byte(imm1>>8), byte(imm1>>16), byte(imm1>>24))
+	c.emitOpcode(op)
+	c.emitImmU32(imm0)
+	c.emitImmU32(imm1)
 }
 
 func (c *compilestate) opu16u16u16(v *value, op bcop, imm0, imm1, imm2 uint16) {
 	checkImmediateBeforeEmit3(op, 2, 2, 2)
-	c.instrs = append(
-		c.instrs,
-		byte(op), byte(op>>8),
-		byte(imm0), byte(imm0>>8),
-		byte(imm1), byte(imm1>>8),
-		byte(imm2), byte(imm2>>8))
+	c.emitOpcode(op)
+	c.emitImmU16(imm0)
+	c.emitImmU16(imm1)
+	c.emitImmU16(imm2)
 }
 
 func (c *compilestate) ops16(v *value, o bcop, slot stackslot) {
