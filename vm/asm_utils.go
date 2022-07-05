@@ -12,15 +12,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#include "textflag.h"
-#include "funcdata.h"
-#include "go_asm.h"
+package vm
 
-  // Takes a single uint16 parameter denoting opcode ID and returns the address of the associated handler 
-TEXT x64asm_getOpcodeAddressUnsafe(SB), NOSPLIT|NOFRAME, $0-8
-  MOVWQZX 8(SP), AX      // 16-bit opcode ID
-  LEAQ opaddrs+0(SB), CX // opaddrs table base address
-  MOVQ (CX)(AX*8), AX
-  MOVQ AX, 16(SP)        // return value
-  RET
+import _ "unsafe"
 
+// The Unsafe variants assume all the parameters are valid. If pre-validation is required, it should be provided by the respective wrappers.\
+
+// Takes a single uint16 parameter denoting opcode ID and returns the address of the associated handler.
+//
+//go:noescape
+//go:norace
+//go:nosplit
+func getOpcodeAddressUnsafe(op uint16) uintptr
+//go:linkname getOpcodeAddressUnsafe x64asm_getOpcodeAddressUnsafe
+
+func getOpcodeAddress(op uint16) uintptr {
+
+    // TODO: validation
+    return getOpcodeAddressUnsafe(op)
+}
