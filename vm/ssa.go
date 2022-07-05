@@ -4700,6 +4700,7 @@ func (c *compilestate) opu32(v *value, op bcop, imm0 uint32) {
 
 func (c *compilestate) opu64(v *value, op bcop, imm0 uint64) {
 	checkImmediateBeforeEmit1(op, 8)
+	c.emitOpcode(op)
 	c.emitImmU64(imm0)
 }
 
