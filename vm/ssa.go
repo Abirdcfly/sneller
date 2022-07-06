@@ -4674,12 +4674,12 @@ func (c *compilestate) emitImmUPtr(imm uintptr) {
 
 func (c *compilestate) emitOpcode(op bcop) {
 
-	//addr := getOpcodeAddress(uint16(op))
-	//fmt.Printf("emitOpcode %d, address=%x\n", op, addr)
+	addr := getOpcodeAddress(uint16(op))
+	fmt.Printf("emitOpcode %d, address=%x\n", op, addr)
 
 	//c.instrs = append(c.instrs, byte(op), byte(op>>8))
-	c.emitImmU16(uint16(op))
-	//c.emitImmUPtr(addr)
+	//c.emitImmU16(uint16(op))
+	c.emitImmUPtr(addr)
 }
 
 func (c *compilestate) op(v *value, op bcop) {

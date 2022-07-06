@@ -51,23 +51,12 @@
 // (VIRT_BCPTR must be set to the *bytecode pointer)
 //
 //  VMENTER() also takes care to reset the output scratch buffer
-#define VMENTER(tmp1, tmp2)                       \
+#define VMENTER()                                 \
   KMOVW K1, K7                                    \
   MOVQ bytecode_compiled(VIRT_BCPTR), VIRT_PCREG  \
   MOVQ bytecode_vstack(VIRT_BCPTR), VIRT_VALUES   \
-  BCCLEARSCRATCH(tmp1)                            \
-  MOVWQZX 0(VIRT_PCREG), tmp1                     \
-  ADDQ $2, VIRT_PCREG                             \
-  LEAQ opaddrs+0(SB), tmp2                        \
-  MOVQ 0(tmp2)(tmp1*8), tmp1                      \
-  CALL tmp1
-
-#define VMCALL(tmp1, tmp2)    \
-  MOVWQZX 0(VIRT_PCREG), tmp1 \
-  ADDQ $2, VIRT_PCREG         \
-  LEAQ opaddrs+0(SB), tmp2    \
-  MOVQ 0(tmp2)(tmp1*8), tmp1  \
-  CALL tmp1
+  ADDQ $8, VIRT_PCREG                             \
+  CALL -8(VIRT_PCREG)
 
 // VM_GET_SCRATCH_BASE_ZMM(dst, mask) sets dst.mask
 // to the current scratch base (equal in all lanes);

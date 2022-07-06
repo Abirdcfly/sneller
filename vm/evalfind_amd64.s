@@ -115,7 +115,7 @@ doit:
   MOVQ    bc+0(FP), VIRT_BCPTR
   MOVQ    ·vmm+0(SB), SI       // real static base
   // enter bytecode interpretation
-  VMENTER(R8, DX)
+  VMENTER()
   JCS     did_abort
 
   KMOVW   K1, R15         // R15 = active rows bitmask

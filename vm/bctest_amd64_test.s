@@ -38,7 +38,7 @@ TEXT ·bctest_run_aux(SB), NOSPLIT, $16
 
     // run the VM
     MOVQ    bc+0(FP), VIRT_BCPTR
-    VMENTER(BX, DX)
+    VMENTER()
 
     // gather results
     MOVQ        ctx+8(FP), CX
