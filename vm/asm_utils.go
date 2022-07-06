@@ -24,9 +24,38 @@ import _ "unsafe"
 //go:norace
 //go:nosplit
 func getOpcodeAddressUnsafe(op uint16) uintptr
+
 //go:linkname getOpcodeAddressUnsafe x64asm_getOpcodeAddressUnsafe
 
 func getOpcodeAddress(op bcop) uintptr {
 
-    return getOpcodeAddressUnsafe(uint16(op))
+	return getOpcodeAddressUnsafe(uint16(op))
+}
+
+func getOpcodeAddressAsArray(op bcop) []byte {
+
+	addr := getOpcodeAddress(op)
+	return []byte{byte(addr >> 0), byte(addr >> 8), byte(addr >> 16), byte(addr >> 24), byte(addr >> 32), byte(addr >> 40), byte(addr >> 48), byte(addr >> 56)}
+}
+
+// Reverse mapping from opcode adresses to opcode IDs. For pretty printers, serializers etc.
+
+var opcodeToIdMapSingleton map[uintptr]bcop
+
+func init() {
+
+	opcodeToIdMapSingleton = make(map[uintptr]bcop)
+
+	for i := 0; i != _maxbcop; i++ {
+
+		id := bcop(i)
+		addr := getOpcodeAddress(id)
+		opcodeToIdMapSingleton[addr] = id
+	}
+}
+
+func getOpcodeID(addr uintptr) (bcop, bool) {
+
+	val, present := opcodeToIdMapSingleton[addr]
+	return val, present
 }

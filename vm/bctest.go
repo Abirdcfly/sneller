@@ -57,10 +57,7 @@ func bctest_run_aux(bc *bytecode, ctx *bctestContext)
 // them back.
 func (c *bctestContext) Execute(op bcop) error {
 	bc := bytecode{
-		compiled: []byte{
-			byte(op), byte(op >> 8),
-			byte(opret), byte(opret >> 8),
-		},
+		compiled: opcodeToBytes(opret),
 		dict: c.dict,
 	}
 

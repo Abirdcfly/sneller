@@ -617,8 +617,10 @@ func formatBytecode(compiled []byte) string {
 			break
 		}
 
-		op := bcop(uint16(compiled[i]) + (uint16(compiled[i+1]) << 8))
-		i += 2
+        op_addr := uintptr(compiled[i]) + (uintptr(compiled[i+1]) << 8) + (uintptr(compiled[i+2]) << 16) + (uintptr(compiled[i+3]) << 24) +
+                 (uintptr(compiled[i+4]) << 32) + (uintptr(compiled[i+5]) << 40) + (uintptr(compiled[i+6]) << 48) + (uintptr(compiled[i+7]) << 56)
+        op, _ := getOpcodeID(op_addr)
+		i += 8
 
 		info := &opinfo[op]
 		b.WriteString(info.text)
@@ -693,7 +695,7 @@ func (b *bytecode) String() string {
 // to the bytecode buffer and checks that the stack
 // depth is sane
 func (b *bytecode) finalize() error {
-	b.compiled = append(b.compiled, byte(opret), byte(opret>>8))
+	b.compiled = append(b.compiled, opcodeToBytes(opret)...)
 	return nil
 }
 
