@@ -14,7 +14,11 @@
 
 package vm
 
-import _ "unsafe"
+import (
+
+    _ "unsafe"
+    "sync"
+)
 
 // The Unsafe variants assume all the parameters are valid. If pre-validation is required, it should be provided by the respective wrappers.
 
@@ -32,24 +36,27 @@ func getOpcodeAddress(op bcop) uintptr {
 	return getOpcodeAddressUnsafe(uint16(op))
 }
 
-// Reverse mapping from opcode adresses to opcode IDs. For pretty printers, serializers etc.
+// Reverse mapping from opcode adresses to opcode IDs. For pretty printers, serializers etc. 
 
-var opcodeToIdMapSingleton map[uintptr]bcop
-
-func init() {
-
-	opcodeToIdMapSingleton = make(map[uintptr]bcop)
-
-	for i := 0; i != _maxbcop; i++ {
-
-		id := bcop(i)
-		addr := getOpcodeAddress(id)
-		opcodeToIdMapSingleton[addr] = id
-	}
-}
+var opcodeToIdMapOnce sync.Once
+var opcodeToIdMap map[uintptr]bcop
 
 func getOpcodeID(addr uintptr) (bcop, bool) {
 
-	val, present := opcodeToIdMapSingleton[addr]
+    // Lazy initialization of the map
+
+    opcodeToIdMapOnce.Do(func() {
+
+        opcodeToIdMap = make(map[uintptr]bcop)
+
+        for i := 0; i != _maxbcop; i++ {
+
+            id := bcop(i)
+            addr := getOpcodeAddress(id)
+            opcodeToIdMap[addr] = id
+        }
+    })
+
+	val, present := opcodeToIdMap[addr]
 	return val, present
 }
