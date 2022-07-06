@@ -55,11 +55,7 @@ doit:
   MOVQ    bytecode_compiled(DI), VIRT_PCREG
   MOVQ    bytecode_vstack(DI), VIRT_VALUES
   ADDQ    R10, VIRT_VALUES                     // stack offset += rows out
-  MOVWQZX 0(VIRT_PCREG), R8
-  LEAQ    opaddrs+0(SB), DX
-  MOVQ    0(DX)(R8*8), R8
-  ADDQ    $2, VIRT_PCREG
-  CALL    R8
+  VMINVOKE()
   JC      opcode_failed                        // break on error
 
   ADDQ    0(SP), R10                           // moar stack
