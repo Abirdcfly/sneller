@@ -16,7 +16,7 @@ package vm
 
 import (
 
-    "fmt"
+    _ "fmt"
 )
 
 type assembler struct {
