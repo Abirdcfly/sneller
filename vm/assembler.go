@@ -83,10 +83,7 @@ func (a* assembler) emitImmUPtr(imm uintptr) {
 func (a* assembler) emitOpcode(op bcop) {
 
 	addr := getOpcodeAddress(op)
-	fmt.Printf("emitOpcode %d, address=%x\n", op, addr)
-
-	//c.instrs = append(c.instrs, byte(op), byte(op>>8))
-	//c.emitImmU16(uint16(op))
+	//fmt.Printf("emitOpcode %d, address=%x\n", op, addr)
 	a.emitImmUPtr(addr)
 }
 
