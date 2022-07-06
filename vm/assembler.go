@@ -24,6 +24,11 @@ type assembler struct {
     code []byte
 }
 
+func makeAssembler() assembler {
+
+    return assembler{}
+}
+
 func (a* assembler) getCode() []byte {
 
     return a.code
@@ -90,7 +95,7 @@ func (a* assembler) emitOpcode(op bcop) {
 
 func opcodeToBytes(op bcop) []byte {
 
-    asm := new(assembler)
+    asm := assembler{}
     asm.emitOpcode(op)
     return asm.grabCode()
 }

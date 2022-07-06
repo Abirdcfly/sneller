@@ -64,7 +64,7 @@ func (c *bctestContext) Free() {
 // them back.
 func (c *bctestContext) Execute(op bcop) error {
 
-    asm := new(assembler)
+    asm := assembler{}
     asm.emitOpcode(op)
     asm.emitOpcode(opret)
     p := asm.grabCode()
@@ -74,7 +74,7 @@ func (c *bctestContext) Execute(op bcop) error {
 // ExecuteImm2 runs a single opcode with a 2-byte immediate.
 func (c *bctestContext) ExecuteImm2(op bcop, imm2 uint16) error {
 
-    asm := new(assembler)
+    asm := assembler{}
     asm.emitOpcode(op)
     asm.emitImmU16(imm2)
     asm.emitOpcode(opret)
