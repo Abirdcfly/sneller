@@ -21,23 +21,24 @@ import (
 
 type assembler struct {
 
-    content []byte
+    code []byte
 }
 
-func (a* assembler) getContent() []byte {
+func (a* assembler) getCode() []byte {
 
-    return a.content
+    return a.code
 }
 
-func (a* assembler) grabContent() []byte {
+func (a* assembler) grabCode() []byte {
 
-    r := a.content
+    r := a.code
+    a.code = nil
     return r
 }
 
 func (a* assembler) emitImmU8(imm uint8) {
 
-    a.content = append(a.content, byte(imm))
+    a.code = append(a.code, byte(imm))
 }
 
 func (a* assembler) emitImmI8(imm int8) {
@@ -47,7 +48,7 @@ func (a* assembler) emitImmI8(imm int8) {
 
 func (a* assembler) emitImmU16(imm uint16) {
 
-	a.content = append(a.content, byte(imm), byte(imm>>8))
+	a.code = append(a.code, byte(imm), byte(imm>>8))
 }
 
 func (a* assembler) emitImmI16(imm int16) {
@@ -57,7 +58,7 @@ func (a* assembler) emitImmI16(imm int16) {
 
 func (a* assembler) emitImmU32(imm uint32) {
 
-	a.content = append(a.content, byte(imm), byte(imm>>8), byte(imm>>16), byte(imm>>24))
+	a.code = append(a.code, byte(imm), byte(imm>>8), byte(imm>>16), byte(imm>>24))
 }
 
 func (a* assembler) emitImmI32(imm int32) {
@@ -67,7 +68,7 @@ func (a* assembler) emitImmI32(imm int32) {
 
 func (a* assembler) emitImmU64(imm uint64) {
 
-	a.content = append(a.content, byte(imm), byte(imm>>8), byte(imm>>16), byte(imm>>24), byte(imm>>32), byte(imm>>40), byte(imm>>48), byte(imm>>56))
+	a.code = append(a.code, byte(imm), byte(imm>>8), byte(imm>>16), byte(imm>>24), byte(imm>>32), byte(imm>>40), byte(imm>>48), byte(imm>>56))
 }
 
 func (a* assembler) emitImmI64(imm int64) {
@@ -91,5 +92,5 @@ func opcodeToBytes(op bcop) []byte {
 
     asm := new(assembler)
     asm.emitOpcode(op)
-    return asm.grabContent()
+    return asm.grabCode()
 }

@@ -23,8 +23,8 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/SnellerInc/sneller/expr"
-	ionsort "github.com/SnellerInc/sneller/internal/sort"
 	"github.com/SnellerInc/sneller/ion"
+	"github.com/SnellerInc/sneller/sorting"
 )
 
 const (
@@ -63,14 +63,14 @@ func (h *HashAggregate) OrderByGroup(n int, desc bool, nullslast bool) error {
 	if n < 0 || n >= len(h.by) {
 		return fmt.Errorf("group %d doesn't exist", n)
 	}
-	o := ionsort.Ordering{}
-	o.Direction = ionsort.Ascending
-	o.Nulls = ionsort.NullsFirst
+	o := sorting.Ordering{}
+	o.Direction = sorting.Ascending
+	o.Nulls = sorting.NullsFirst
 	if desc {
-		o.Direction = ionsort.Descending
+		o.Direction = sorting.Descending
 	}
 	if nullslast {
-		o.Nulls = ionsort.NullsLast
+		o.Nulls = sorting.NullsLast
 	}
 	h.order = append(h.order, func(agt *aggtable, left, right hpair) int {
 		leftmem := agt.repridx(&left, n)
@@ -200,6 +200,21 @@ func NewHashAggregate(agg Aggregation, by Selection, dst QuerySink) (*HashAggreg
 
 			out[i] = prog.AggregateSlotCount(mem, bucket, k, offset)
 			kinds[i] = AggregateKindCount
+		} else if op.IsBoolOp() {
+			argv, err := prog.compileAsBool(agg[i].Expr.Inner)
+			if err != nil {
+				return nil, fmt.Errorf("don't know how to aggregate %q: %w", agg[i].Expr.Inner, err)
+			}
+			switch op {
+			case expr.OpBoolAnd:
+				out[i] = prog.AggregateSlotBoolAnd(mem, bucket, argv, allColumnsMask, offset)
+				kinds[i] = AggregateKindAndK
+			case expr.OpBoolOr:
+				out[i] = prog.AggregateSlotBoolOr(mem, bucket, argv, allColumnsMask, offset)
+				kinds[i] = AggregateKindOrK
+			default:
+				return nil, fmt.Errorf("unsupported aggregate operation: %s", &agg[i])
+			}
 		} else {
 			argv, err := prog.compileAsNumber(agg[i].Expr.Inner)
 			if err != nil {

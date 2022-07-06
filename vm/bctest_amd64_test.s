@@ -19,11 +19,10 @@
 
 
 // func bctest_run_aux(bc *bytecode, ctx *bctestContext)
-TEXT ·bctest_run_aux(SB), NOSPLIT, $16
+TEXT ·bctest_run_aux(SB), NOSPLIT, $0
     MOVQ    ctx+8(FP), CX
 
     // setup regs for bytecode
-    MOVQ        bctestContext_data(CX), VIRT_BASE
     VMOVDQU64   bctestContext_structBase(CX), Z0
     VMOVDQU64   bctestContext_structLen(CX), Z1
     VMOVDQU64   bctestContext_scalar+0(CX), Z2
@@ -38,6 +37,7 @@ TEXT ·bctest_run_aux(SB), NOSPLIT, $16
 
     // run the VM
     MOVQ    bc+0(FP), VIRT_BCPTR
+    MOVQ    ·vmm+0(SB), SI  // real static base
     VMENTER()
 
     // gather results

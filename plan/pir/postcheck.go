@@ -14,8 +14,35 @@
 
 package pir
 
+import (
+	"github.com/SnellerInc/sneller/expr"
+)
+
 var rules = []func(t *Trace) error{
 	checkSortSize,
+}
+
+func checkAggregateWorkInProgress(e expr.Node) error {
+	var err error
+	v := visitfn(func(e expr.Node) bool {
+		if err != nil {
+			return false
+		}
+		agg, ok := e.(*expr.Aggregate)
+		if ok {
+			if agg.Over != nil {
+				err = errorf(agg, "window function in unexpected position")
+				return false
+			}
+			if agg.Filter != nil {
+				err = errorf(agg, "aggregate filters not yet supported")
+				return false
+			}
+		}
+		return true
+	})
+	expr.Walk(v, e)
+	return err
 }
 
 func checkSortSize(t *Trace) error {

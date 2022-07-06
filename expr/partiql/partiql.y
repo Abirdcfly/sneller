@@ -43,6 +43,7 @@ import (
     pc       expr.PathComponent
     order    expr.Order
     sel      *expr.Select
+    wind     *expr.Window
     bind     expr.Binding
     jk       expr.JoinKind
     from     expr.From
@@ -57,12 +58,14 @@ import (
 %left UNION
 %token SELECT FROM WHERE GROUP ORDER BY HAVING LIMIT OFFSET WITH INTO
 %token DISTINCT ALL AS EXISTS NULLS FIRST LAST ASC DESC
+%token PARTITION
 %token VALUE
-%right COUNT MIN MAX SUM AVG BIT_AND BIT_OR BIT_XOR COALESCE NULLIF EXTRACT DATE_TRUNC
+%right COALESCE NULLIF EXTRACT DATE_TRUNC
 %right CAST UTCNOW
 %right DATE_ADD DATE_DIFF EARLIEST LATEST
 %left JOIN LEFT RIGHT CROSS INNER OUTER FULL
 %left ON
+%token <integer> AGGREGATE
 %token <str> ID
 %token <empty> '(' ',' ')' '[' ']' '{' '}'
 %token <empty> NULL TRUE FALSE MISSING
@@ -72,7 +75,7 @@ import (
 %right '!' '~' NOT
 %left BETWEEN CASE WHEN THEN ELSE END
 %left <empty> EQ NE LT LE GT GE
-%left <empty> ILIKE LIKE IN IS
+%left <empty> ILIKE LIKE IN IS OVER FILTER
 %left <empty> '|'
 %left <empty> '^'
 %left <empty> '&'
@@ -88,6 +91,7 @@ import (
 
 %type <expr> query expr datum datum_or_parens path_expression maybe_into
 %type <expr> where_expr having_expr case_optional_else parenthesized_expr
+%type <expr> optional_filter
 %type <with> maybe_cte_bindings cte_bindings
 %type <pc> path_component
 %type <yesno> ascdesc nullslast maybe_distinct
@@ -104,7 +108,7 @@ import (
 %type <exprint> limit_expr
 %type <exprint> offset_expr
 %type <limbs> case_limbs
-
+%type <wind> maybe_window
 %start query
 
 %%
@@ -182,53 +186,14 @@ datum_or_parens
 {
   $$ = $1
 }
-| COUNT '(' '*' ')'
+| AGGREGATE '(' maybe_distinct expr ')' optional_filter maybe_window
 {
-  $$ = expr.Count(expr.Star{})
+  $$ = toAggregate(expr.AggregateOp($1), $4, $3, $6, $7)
 }
-| COUNT '(' DISTINCT expr ')'
+| AGGREGATE '(' '*' ')' optional_filter maybe_window // realistically only COUNT(*)
 {
-  $$ = expr.CountDistinct($4)
-}
-| COUNT '(' expr ')'
-{
-  $$ = expr.Count($3)
-}
-| SUM '(' expr ')'
-{
-  $$ =  expr.Sum($3)
-}
-| MIN '(' expr ')'
-{
-  $$ = expr.Min($3)
-}
-| MAX '(' expr ')'
-{
-  $$ = expr.Max($3)
-}
-| AVG '(' expr ')'
-{
-  $$ = expr.Avg($3)
-}
-| BIT_AND '(' expr ')'
-{
-  $$ = expr.AggregateAnd($3)
-}
-| BIT_OR '(' expr ')'
-{
-  $$ = expr.AggregateOr($3)
-}
-| BIT_XOR '(' expr ')'
-{
-  $$ = expr.AggregateXor($3)
-}
-| EARLIEST '(' expr ')'
-{
-  $$ = expr.Earliest($3)
-}
-| LATEST '(' expr ')'
-{
-  $$ = expr.Latest($3)
+  distinct := false
+  $$ = toAggregate(expr.AggregateOp($1), expr.Star{}, distinct, $5, $6)
 }
 | CASE case_limbs case_optional_else END
 {
@@ -471,6 +436,13 @@ expr { $$ = []expr.Node{$1} } |
 '*' { $$ = []expr.Node{expr.Star{}} } |
 value_list ',' expr { $$ = append($1, $3) }
 
+maybe_window:
+OVER '(' PARTITION BY value_list order_expr ')'
+{
+  $$ = &expr.Window{PartitionBy: $5, OrderBy: $6}
+}
+| { $$ = nil }
+
 join_kind:
 JOIN { $$ = expr.InnerJoin } |
 INNER JOIN { $$ = expr.InnerJoin } |
@@ -521,6 +493,10 @@ ELSE expr { $$ = $2 }
 case_limbs:
 WHEN expr THEN expr { $$ = []expr.CaseLimb{{When: $2, Then: $4}} }
 | case_limbs WHEN expr THEN expr { $$ = append($1, expr.CaseLimb{When: $3, Then: $5}) }
+
+optional_filter:
+{ $$ = nil } |
+FILTER '(' WHERE expr ')' { $$ = $4 }
 
 where_expr:
 { $$ = nil } |

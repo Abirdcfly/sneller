@@ -242,6 +242,13 @@ func (st *tableState) dedup(idx *blockfmt.Index, lst []blockfmt.Input) (*blockfm
 	for i := range lst {
 		ret, err := idx.Inputs.Append(lst[i].Path, lst[i].ETag, descID)
 		if err != nil {
+			if errors.Is(err, blockfmt.ErrETagChanged) {
+				// the file at this path has been overwritten
+				// with new content; we can't "replace" the old
+				// data so there's not much we can do here...
+				lst[i].R.Close()
+				continue
+			}
 			return nil, nil, err
 		}
 		if ret {
@@ -377,20 +384,15 @@ func (b *Builder) Sync(who Tenant, db, tblpat string) error {
 	if err != nil {
 		return err
 	}
-	possible, err := fs.Glob(dst, path.Join("db", db, tblpat, "definition.[yj][sa][om][nl]"))
+	possible, err := fs.Glob(dst, DefinitionPattern(db, tblpat))
 	if err != nil {
 		return err
 	}
 	var tables []string
 	for i := range possible {
-		switch path.Base(possible[i]) {
-		case "definition.json", "definition.yaml":
-			tab, _ := path.Split(possible[i])
-			b.logf("detected table at path %q", tab)
-			tables = append(tables, path.Base(tab))
-		default:
-			// continue
-		}
+		tab, _ := path.Split(possible[i])
+		b.logf("detected table at path %q", tab)
+		tables = append(tables, path.Base(tab))
 	}
 	syncTable := func(table string) error {
 		st, err := b.open(db, table, who)

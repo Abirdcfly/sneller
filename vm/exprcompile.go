@@ -1086,14 +1086,16 @@ func (p *prog) member(e expr.Node, values []expr.Constant) (*value, error) {
 func (p *prog) recordDatum(d ion.Datum, st syms) {
 	switch d := d.(type) {
 	case *ion.Struct:
-		for i := range d.Fields {
-			p.record(st.Get(d.Fields[i].Sym), d.Fields[i].Sym)
-			p.recordDatum(d.Fields[i].Value, st)
-		}
-	case ion.List:
-		for i := range d {
-			p.recordDatum(d[i], st)
-		}
+		d.Each(func(f ion.Field) bool {
+			p.record(st.Get(f.Sym), f.Sym)
+			p.recordDatum(f.Value, st)
+			return true
+		})
+	case *ion.List:
+		d.Each(func(d ion.Datum) bool {
+			p.recordDatum(d, st)
+			return true
+		})
 	case ion.Interned:
 		sym, ok := st.Symbolize(string(d))
 		if !ok {
@@ -1478,7 +1480,7 @@ func (p *prog) compileCast(c *expr.Cast) (*value, error) {
 			// and merge the masks
 			istrue := p.IsTrue(from)
 			isbool := p.checkTag(from, expr.BoolType)
-			vi := p.ssa2(sbooltoint, istrue, isbool)
+			vi := p.ssa2(scvtktoi, istrue, isbool)
 			k := p.mask(vi)
 			vi = p.ssa3(stoint, vi, from, p.nand(k, p.mask(from)))
 			k = p.Or(k, vi)
@@ -1488,7 +1490,7 @@ func (p *prog) compileCast(c *expr.Cast) (*value, error) {
 			return p.intk(v, k), nil
 		case stBool:
 			// true/false/missing -> 1/0/missing
-			return p.ssa2(sbooltoint, from, p.notMissing(from)), nil
+			return p.ssa2(scvtktoi, from, p.notMissing(from)), nil
 		default:
 			return nil, fmt.Errorf("unable to convert %s to an integer", c)
 		}
@@ -1500,7 +1502,7 @@ func (p *prog) compileCast(c *expr.Cast) (*value, error) {
 		case stFloat:
 			return from, nil
 		case stInt:
-			return p.ssa2(sinttofp, from, p.mask(from)), nil
+			return p.ssa2(scvtitof, from, p.mask(from)), nil
 		case stValue:
 			// parse bool  -> float
 			//       int   -> float
@@ -1508,16 +1510,16 @@ func (p *prog) compileCast(c *expr.Cast) (*value, error) {
 			// all simultaneously
 			istrue := p.IsTrue(from)
 			isbool := p.checkTag(from, expr.BoolType)
-			s := p.ssa2(sbooltofp, istrue, isbool)
+			s := p.ssa2(scvtktof, istrue, isbool)
 			k := p.mask(s)
 			s = p.ssa3(stoint, s, from, p.nand(k, p.ValidLanes()))
-			s = p.ssa2(sinttofp, s, s)
+			s = p.ssa2(scvtitof, s, s)
 			k = p.Or(k, s)
 			s = p.ssa3(stofloat, s, from, p.nand(k, p.ValidLanes()))
 			k = p.Or(k, s)
 			return p.floatk(s, k), nil
 		case stBool:
-			return p.ssa2(sbooltofp, from, p.notMissing(from)), nil
+			return p.ssa2(scvtktof, from, p.notMissing(from)), nil
 		default:
 			return p.ssa0(skfalse), nil
 		}

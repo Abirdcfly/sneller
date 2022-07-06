@@ -70,6 +70,9 @@ var sameq = []string{
 	"WITH foo AS (SELECT x, y FROM table), bar AS (SELECT z, a FROM table) SELECT x FROM foo CROSS JOIN bar",
 	"SELECT * FROM (t1 ++ t2 ++ t3)",
 	"SELECT x, y INTO db.xyz FROM db.foo WHERE x = 'foo' AND y = 'bar'",
+	"SELECT x, SUM(x) OVER (PARTITION BY y, z ORDER BY col0 ASC NULLS FIRST, col1 DESC NULLS FIRST) FROM db.foo",
+	"SELECT COUNT(*) FROM table",
+	"SELECT COUNT(*) AS total, COUNT(x) FILTER (WHERE x > 0) AS greater FROM table",
 }
 
 func TestParseSFW(t *testing.T) {

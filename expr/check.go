@@ -128,6 +128,8 @@ func (c *checktable) Visit(n Node) Visitor {
 	case String:
 		// FIXME: allowed for now, but really shouldn't be...
 		return nil
+	case *Appended:
+		return c.parent
 	default:
 		c.errorf("cannot use %s in table position", ToString(n))
 		return nil
@@ -289,4 +291,31 @@ func (c *Cast) check(h Hint) error {
 		}
 	}
 	return nil
+}
+
+type visitfn func(Node) Visitor
+
+func (v visitfn) Visit(e Node) Visitor {
+	return v(e)
+}
+
+func containsAggregate(e Node) (bool, error) {
+	var fn visitfn
+	seen := false
+	var err error
+	fn = func(e Node) Visitor {
+		if a, ok := e.(*Aggregate); ok {
+			seen = true
+			sub, suberr := containsAggregate(a.Inner)
+			if suberr != nil {
+				err = suberr
+			} else if sub {
+				err = errsyntaxf("%s contains an aggregate-within-aggregate", ToString(a))
+			}
+			return nil
+		}
+		return fn
+	}
+	Walk(fn, e)
+	return seen, err
 }

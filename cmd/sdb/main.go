@@ -22,7 +22,6 @@ import (
 	"io"
 	"os"
 	"path"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -88,7 +87,7 @@ func load(defpath string) *db.Definition {
 		exitf("%s\n", err)
 	}
 	defer f.Close()
-	s, err := db.DecodeDefinition(f, filepath.Ext(defpath))
+	s, err := db.DecodeDefinition(f)
 	if err != nil {
 		exitf("%s\n", err)
 	}
@@ -419,7 +418,7 @@ type appletList []applet
 var applets = appletList{
 	{
 		name: "create",
-		help: "<db> <definition.json|definition.yaml>",
+		help: "<db> <definition.json>",
 		desc: `create a new table from a def
 The command
   $ sdb create <db> definition.json

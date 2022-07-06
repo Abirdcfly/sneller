@@ -18,7 +18,8 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
-	"reflect"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -35,16 +36,16 @@ func TestDatumEncode(t *testing.T) {
 		{Bool(true), "true"},
 		{Bool(false), "false"},
 		{
-			datum: &Struct{
-				Fields: []Field{
+			datum: NewStruct(nil,
+				[]Field{
 					{"foo", String("foo"), 0},
 					{"bar", UntypedNull{}, 0},
-					{"inner", List{
+					{"inner", NewList(nil, []Datum{
 						Int(-1), Uint(0), Uint(1),
-					}, 0},
+					}), 0},
 					{"name", String("should-come-first"), 0},
 				},
-			},
+			),
 			str: `{"name": "should-come-first", "foo": "foo", "bar": null, "inner": [-1, 0, 1]}`,
 		},
 	}
@@ -76,7 +77,7 @@ func TestDatumEncode(t *testing.T) {
 			t.Errorf("decoding datum %+v: %s", data[i].datum, err)
 			continue
 		}
-		if !reflect.DeepEqual(out, data[i].datum) {
+		if !Equal(out, data[i].datum) {
 			t.Errorf("got  %#v", out)
 			t.Errorf("want %#v", data[i].datum)
 		}
@@ -117,4 +118,79 @@ func TestDatumFromJSON(t *testing.T) {
 			t.Errorf("output: %q", outstr)
 		}
 	}
+}
+
+func BenchmarkDatumPassthrough(b *testing.B) {
+	files := []string{
+		"nyc-taxi.block",
+		"parking.10n",
+		"parking2.ion",
+		"parking3.ion",
+	}
+	for i := range files {
+		f := filepath.Join("../testdata/", files[i])
+		buf, err := os.ReadFile(f)
+		if err != nil {
+			b.Fatal(err)
+		}
+		b.Run(files[i], func(b *testing.B) {
+			b.ReportAllocs()
+			var st Symtab
+			var dst Buffer
+			for i := 0; i < b.N; i++ {
+				st.Reset()
+				dst.Reset()
+				body := buf
+				for len(body) > 0 {
+					d, rest, err := ReadDatum(&st, body)
+					if err != nil {
+						b.Fatal(err)
+					}
+					d.Encode(&dst, &st)
+					body = rest
+				}
+			}
+		})
+	}
+}
+
+func FuzzReadDatum(f *testing.F) {
+	var tcs = []string{
+		"0",
+		"1",
+		"true",
+		"false",
+		`"foo"`,
+		`{"foo": {"bar": "baz"}, "quux": 3}`,
+		`{"first": 0.02, "arr": [0, false, null, {}]}`,
+	}
+	for i := range tcs {
+		var st Symtab
+		var buf Buffer
+		d := json.NewDecoder(strings.NewReader(tcs[i]))
+		dat, err := FromJSON(&st, d)
+		if err != nil {
+			f.Fatalf("decoding %q: %s", tcs[i], err)
+		}
+		st.Marshal(&buf, true)
+		dat.Encode(&buf, &st)
+		f.Add(buf.Bytes())
+	}
+	f.Fuzz(func(t *testing.T, buf []byte) {
+		var st Symtab
+		var err error
+		var d Datum
+		for len(buf) > 0 {
+			d, buf, err = ReadDatum(&st, buf)
+			if err != nil {
+				break
+			}
+			switch d := d.(type) {
+			case *List:
+				d.Each(func(d Datum) bool { return true })
+			case *Struct:
+				d.Each(func(f Field) bool { return true })
+			}
+		}
+	})
 }

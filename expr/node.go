@@ -24,6 +24,8 @@ import (
 
 	"github.com/SnellerInc/sneller/date"
 	"github.com/SnellerInc/sneller/ion"
+
+	"golang.org/x/exp/slices"
 )
 
 // Visitor is an interface that must
@@ -144,6 +146,12 @@ const (
 	// Describes SQL BIT_XOR(...) aggregate operation.
 	OpBitXor
 
+	// Describes SQL BOOL_AND(...) aggregate operation.
+	OpBoolAnd
+
+	// Describes SQL BOOL_OR(...) aggregate operation.
+	OpBoolOr
+
 	// Describes SQL MIN(timestamp).
 	//
 	// EARLIEST() function is used by Sneller to distinguish
@@ -156,6 +164,10 @@ const (
 	// between arithmetic vs timestamp aggregation
 	OpLatest
 )
+
+func (a AggregateOp) IsBoolOp() bool {
+	return a == OpBoolAnd || a == OpBoolOr
+}
 
 func (a AggregateOp) defaultResult() string {
 	switch a {
@@ -196,6 +208,16 @@ func (a AggregateOp) String() string {
 		return "EARLIEST"
 	case OpLatest:
 		return "LATEST"
+	case OpBitAnd:
+		return "BIT_AND"
+	case OpBitOr:
+		return "BIT_OR"
+	case OpBitXor:
+		return "BIT_XOR"
+	case OpBoolAnd:
+		return "BOOL_AND"
+	case OpBoolOr:
+		return "BOOL_OR"
 	default:
 		return "none"
 	}
@@ -208,6 +230,11 @@ type Aggregate struct {
 	Op AggregateOp
 	// Inner is the expression to be aggregated
 	Inner Node
+	// Over, if non-nil, is the OVER part
+	// of the aggregation
+	Over *Window
+	// Filter is an optional filtering expression
+	Filter Node
 }
 
 func (a *Aggregate) Equals(e Node) bool {
@@ -215,7 +242,19 @@ func (a *Aggregate) Equals(e Node) bool {
 	if !ok {
 		return false
 	}
-	return ea.Op == a.Op && a.Inner.Equals(ea.Inner)
+	if ea.Op != a.Op || !a.Inner.Equals(ea.Inner) {
+		return false
+	}
+	if a.Over == nil {
+		return ea.Over == nil
+	}
+	if !slices.EqualFunc(a.Over.PartitionBy, ea.Over.PartitionBy, Equivalent) {
+		return false
+	}
+	oeq := func(a, b Order) bool {
+		return a.Equals(&b)
+	}
+	return slices.EqualFunc(a.Over.OrderBy, ea.Over.OrderBy, oeq)
 }
 
 func settype(dst *ion.Buffer, st *ion.Symtab, str string) {
@@ -230,6 +269,25 @@ func (a *Aggregate) Encode(dst *ion.Buffer, st *ion.Symtab) {
 	dst.WriteUint(uint64(a.Op))
 	dst.BeginField(st.Intern("inner"))
 	a.Inner.Encode(dst, st)
+
+	if a.Over != nil {
+		dst.BeginField(st.Intern("over_partition"))
+		dst.BeginList(-1)
+		for i := range a.Over.PartitionBy {
+			a.Over.PartitionBy[i].Encode(dst, st)
+		}
+		dst.EndList()
+		if len(a.Over.OrderBy) > 0 {
+			dst.BeginField(st.Intern("over_order_by"))
+			EncodeOrder(a.Over.OrderBy, dst, st)
+		}
+	}
+
+	if a.Filter != nil {
+		dst.BeginField(st.Intern("filter_where"))
+		a.Filter.Encode(dst, st)
+	}
+
 	dst.EndStruct()
 }
 
@@ -245,6 +303,32 @@ func (a *Aggregate) setfield(name string, st *ion.Symtab, body []byte) error {
 		var err error
 		a.Inner, _, err = Decode(st, body)
 		return err
+	case "over_partition":
+		if a.Over == nil {
+			a.Over = new(Window)
+		}
+		_, err := ion.UnpackList(body, func(field []byte) error {
+			item, _, err := Decode(st, field)
+			if err != nil {
+				return err
+			}
+			a.Over.PartitionBy = append(a.Over.PartitionBy, item)
+			return nil
+		})
+		return err
+	case "over_order_by":
+		if a.Over == nil {
+			a.Over = new(Window)
+		}
+		var err error
+		a.Over.OrderBy, err = decodeOrder(st, body)
+		return err
+	case "filter_where":
+		var err error
+		a.Filter, _, err = Decode(st, body)
+		return err
+	default:
+		return fmt.Errorf("expr.Aggregate: setfield: unexpected field %q", name)
 	}
 	return nil
 }
@@ -254,20 +338,62 @@ func (a *Aggregate) text(dst *strings.Builder, redact bool) {
 		dst.WriteString("COUNT(DISTINCT ")
 		a.Inner.text(dst, redact)
 		dst.WriteByte(')')
-		return
+	} else {
+		dst.WriteString(a.Op.String())
+		dst.WriteByte('(')
+		a.Inner.text(dst, redact)
+		dst.WriteByte(')')
 	}
-	dst.WriteString(a.Op.String())
-	dst.WriteByte('(')
-	a.Inner.text(dst, redact)
-	dst.WriteByte(')')
+
+	if a.Filter != nil {
+		dst.WriteString(" FILTER (WHERE ")
+		a.Filter.text(dst, redact)
+		dst.WriteString(")")
+	}
+
+	if a.Over != nil {
+		dst.WriteString(" OVER (PARTITION BY ")
+		for i := range a.Over.PartitionBy {
+			if i > 0 {
+				dst.WriteString(", ")
+			}
+			a.Over.PartitionBy[i].text(dst, redact)
+		}
+		if len(a.Over.OrderBy) > 0 {
+			dst.WriteString(" ORDER BY ")
+			for i := range a.Over.OrderBy {
+				if i > 0 {
+					dst.WriteString(", ")
+				}
+				a.Over.OrderBy[i].text(dst, redact)
+			}
+		}
+		dst.WriteByte(')')
+	}
 }
 
 func (a *Aggregate) walk(v Visitor) {
 	Walk(v, a.Inner)
+	if a.Over != nil {
+		for i := range a.Over.PartitionBy {
+			Walk(v, a.Over.PartitionBy[i])
+		}
+		for i := range a.Over.OrderBy {
+			Walk(v, a.Over.OrderBy[i].Column)
+		}
+	}
 }
 
 func (a *Aggregate) rewrite(r Rewriter) Node {
 	a.Inner = Rewrite(r, a.Inner)
+	if a.Over != nil {
+		for i := range a.Over.PartitionBy {
+			a.Over.PartitionBy[i] = Rewrite(r, a.Over.PartitionBy[i])
+		}
+		for i := range a.Over.OrderBy {
+			a.Over.OrderBy[i].Column = Rewrite(r, a.Over.OrderBy[i].Column)
+		}
+	}
 	return a
 }
 
@@ -319,6 +445,9 @@ func AggregateAnd(e Node) *Aggregate { return &Aggregate{Op: OpBitAnd, Inner: e}
 func AggregateOr(e Node) *Aggregate  { return &Aggregate{Op: OpBitOr, Inner: e} }
 func AggregateXor(e Node) *Aggregate { return &Aggregate{Op: OpBitXor, Inner: e} }
 
+func AggregateBoolAnd(e Node) *Aggregate { return &Aggregate{Op: OpBoolAnd, Inner: e} }
+func AggregateBoolOr(e Node) *Aggregate  { return &Aggregate{Op: OpBoolOr, Inner: e} }
+
 // Earliest produces the EARLIEST(timestamp) aggregate
 func Earliest(e Node) *Aggregate { return &Aggregate{Op: OpEarliest, Inner: e} }
 
@@ -346,6 +475,12 @@ func Equivalent(a, b Node) bool {
 func IsIdentifier(e Node, s string) bool {
 	p, ok := e.(*Path)
 	return ok && p.First == s && p.Rest == nil
+}
+
+// Window is a window function call
+type Window struct {
+	PartitionBy []Node
+	OrderBy     []Order
 }
 
 // ToString returns the string
@@ -2871,14 +3006,14 @@ func (s *Struct) Equals(e Node) bool {
 }
 
 func (s *Struct) Datum() ion.Datum {
-	out := new(ion.Struct)
+	out := make([]ion.Field, 0, len(s.Fields))
 	for i := range s.Fields {
-		out.Fields = append(out.Fields, ion.Field{
+		out = append(out, ion.Field{
 			Label: s.Fields[i].Label,
 			Value: s.Fields[i].Value.Datum(),
 		})
 	}
-	return out
+	return ion.NewStruct(nil, out)
 }
 
 func (s *Struct) Type() TypeSet { return StructType }
@@ -2950,7 +3085,7 @@ func (l *List) Datum() ion.Datum {
 	for i := range l.Values {
 		out[i] = l.Values[i].Datum()
 	}
-	return ion.List(out)
+	return ion.NewList(nil, out)
 }
 
 func (l *List) Equals(e Node) bool {
@@ -3015,26 +3150,38 @@ func AsConstant(d ion.Datum) (Constant, bool) {
 	case ion.String:
 		return String(string(d)), true
 	case *ion.Struct:
-		fields := make([]Field, 0, len(d.Fields))
-		for i := range d.Fields {
-			val, ok := AsConstant(d.Fields[i].Value)
+		fields := make([]Field, 0, d.Len())
+		ok := true
+		d.Each(func(f ion.Field) bool {
+			var val Constant
+			val, ok = AsConstant(f.Value)
 			if !ok {
-				return nil, false
+				return false
 			}
 			fields = append(fields, Field{
-				Label: d.Fields[i].Label,
+				Label: f.Label,
 				Value: val,
 			})
+			return true
+		})
+		if !ok {
+			return nil, false
 		}
 		return &Struct{Fields: fields}, true
-	case ion.List:
-		values := make([]Constant, 0, len(d))
-		for i := range d {
-			val, ok := AsConstant(d[i])
+	case *ion.List:
+		values := make([]Constant, 0, d.Len())
+		ok := true
+		d.Each(func(d ion.Datum) bool {
+			var val Constant
+			val, ok = AsConstant(d)
 			if !ok {
-				return nil, false
+				return false
 			}
 			values = append(values, val)
+			return true
+		})
+		if !ok {
+			return nil, false
 		}
 		return &List{Values: values}, true
 	case ion.Timestamp:
