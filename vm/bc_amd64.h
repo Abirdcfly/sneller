@@ -51,13 +51,13 @@
   ADDQ $8, VIRT_PCREG   \
   CALL -8(VIRT_PCREG)
 
-// VMENTER() takes two clobbers and uses them
-// to jump into the VM instructions
+// VMENTER() sets up the VM control registers and jumps into the VM instructions
 // (VIRT_BCPTR must be set to the *bytecode pointer)
 //
 //  VMENTER() also takes care to reset the output scratch buffer
 #define VMENTER()                                 \
   KMOVW K1, K7                                    \
+  BCCLEARSCRATCH(VIRT_PCREG)                      \
   MOVQ bytecode_compiled(VIRT_BCPTR), VIRT_PCREG  \
   MOVQ bytecode_vstack(VIRT_BCPTR), VIRT_VALUES   \
   VMINVOKE()
