@@ -16,7 +16,7 @@ package vm
 
 import _ "unsafe"
 
-// The Unsafe variants assume all the parameters are valid. If pre-validation is required, it should be provided by the respective wrappers.\
+// The Unsafe variants assume all the parameters are valid. If pre-validation is required, it should be provided by the respective wrappers.
 
 // Takes a single uint16 parameter denoting opcode ID and returns the address of the associated handler.
 //
@@ -26,8 +26,7 @@ import _ "unsafe"
 func getOpcodeAddressUnsafe(op uint16) uintptr
 //go:linkname getOpcodeAddressUnsafe x64asm_getOpcodeAddressUnsafe
 
-func getOpcodeAddress(op uint16) uintptr {
+func getOpcodeAddress(op bcop) uintptr {
 
-    // TODO: validation
-    return getOpcodeAddressUnsafe(op)
+    return getOpcodeAddressUnsafe(uint16(op))
 }
