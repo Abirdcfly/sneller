@@ -32,12 +32,6 @@ func getOpcodeAddress(op bcop) uintptr {
 	return getOpcodeAddressUnsafe(uint16(op))
 }
 
-func getOpcodeAddressAsArray(op bcop) []byte {
-
-	addr := getOpcodeAddress(op)
-	return []byte{byte(addr >> 0), byte(addr >> 8), byte(addr >> 16), byte(addr >> 24), byte(addr >> 32), byte(addr >> 40), byte(addr >> 48), byte(addr >> 56)}
-}
-
 // Reverse mapping from opcode adresses to opcode IDs. For pretty printers, serializers etc.
 
 var opcodeToIdMapSingleton map[uintptr]bcop
