@@ -182,7 +182,7 @@ func (u *unnesting) symbolize(st *symtab) error {
 	maskSlot := stackSlotFromIndex(regV, len(u.parent.outer))
 	u.innerbc.outer = &u.outerbc
     
-    asm := assembler{}
+    asm := assembler{u.innerbc.compiled}
 
     // save.k [0]
     asm.emitOpcode(opsavek)
@@ -204,7 +204,7 @@ func (u *unnesting) symbolize(st *symtab) error {
     asm.emitOpcode(oploadk)
     asm.emitImmU16(uint16(maskSlot))
 
-    u.innerbc.compiled = append(u.innerbc.compiled, asm.getCode()...)
+    u.innerbc.compiled = asm.grabCode()
 	err = p.appendcode(&u.innerbc)
 	if err != nil {
 		return err
